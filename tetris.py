@@ -65,13 +65,15 @@ class Tetris:
     def _has_score(self):
         for y, x in self.block:
             self.matrix[self.old_row + y][self.old_col + x] = "X"
-        for i, line in enumerate(self.matrix):
-            if line.count("X") == self.columns:
-                self._clean_matrix(i)
-                self._draw_board()
+        line_destroy = [i for i, line in enumerate(self.matrix) if line.count("X") == self.columns]
+        if line_destroy:
+            for line in line_destroy[::-1]:
+                self.matrix.pop(line)
+            for _ in line_destroy:
+                self.matrix.insert(0, [" "for col in range(self.columns)])
                 self.score += 1
-                self._draw_score()
-                break
+            self._draw_board()
+            self._draw_score()
 
     def _can_move(self, block, row, col):
         if self.col + col < 0:
@@ -83,11 +85,8 @@ class Tetris:
             return True
         except IndexError:
             pass
-        return False
-
-    def _clean_matrix(self, line):
-        self.matrix.pop(line)
-        self.matrix.insert(0, [" "for col in range(self.columns)])
+        return False 
+        
 
     def _draw_board(self):
         for i, line in enumerate(self.matrix):
