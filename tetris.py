@@ -1,46 +1,141 @@
 import curses
+from random import randint
 
 
 class Tetris:
 
     def __init__(self):
-        key_int = (259, 258, 260, 261, 32)
+        key_int = (259, 258, 260, 261, 32, 410)
         key_func = ("up_arrow", "down_arrow", "left_arrow", "right_arrow",
-                    "space")
+                    "space", "resize_window")
         self.mapping = {n: key_func[i] for i, n in enumerate(key_int)}
-        self.cursor_y = 0
-        self.cursor_x = 0
-        self.old_x = 0
-        self.old_y = 0
 
     def init_cli(self):
         self.stdscr = curses.initscr()
-        curses.start_color()
-        curses.init_pair(1, curses.COLOR_CYAN, curses.COLOR_BLACK)
         curses.noecho()
         curses.curs_set(0)
+        self.score = 0
         self.stdscr.keypad(True)
+        self.stdscr.timeout(0)
+        self.update_size_window()
+        self.columns = self.width // 2
+        self.rows = self.height
+        self.create_game()
+        self.generate_block()
+        self.draw_score()
+
+    def start_game(self):
+        self.finish = False
+        while not self.finish:
+            self.speed = 50
+            count = 0
+            while count <= self.speed:
+                key = self.stdscr.getch()
+                if key in self.mapping.keys():
+                    self.handle_key(key)
+                curses.napms(10)
+                count += 1
+            self.move_down()
+
+    def draw_score(self):
+        size_score = self.width - self.columns - 1
+        for i in range(self.rows):
+            self.stdscr.addstr(i, self.columns, "||%s" %
+                               (" " * (size_score - 2)))
+        middle = self.columns + (size_score - 5) // 2
+        self.stdscr.addstr(self.rows // 2 - 5, middle, "Score:")
+        self.stdscr.addstr(self.rows // 2 - 4, middle, "%s" % self.score)
+
+    def create_game(self):
+        self.matrix = [[" "] * self.columns for _ in range(self.rows)]
+
+    def generate_block(self):
+        col = randint(0, self.columns - 1)
+        self.row, self.old_row = 0, 0
+        self.col, self.old_col = col, col
+        self.update()
+
+    def handle_key(self, key):
+        self.save_old_pos()
+        getattr(self, self.mapping[key])()
+        self.update()
+
+    def save_old_pos(self):
+        self.old_row = self.row
+        self.old_col = self.col
 
     def up_arrow(self):
         pass
 
     def down_arrow(self):
-        self.old_y = self.cursor_y
-        self.cursor_y += 1
+        self.speed = 5
+
+    def move_down(self):
+        self.save_old_pos()
+        if self.can_move(1, 0):
+            self.row += 1
+        else:
+            self.update_matrix()
+            self.is_has_score()
+            self.generate_block()
+        self.update()
+
+    def is_has_score(self):
+        for i, line in enumerate(self.matrix):
+            if line.count("X") == self.columns:
+                self.clean_matrix(i)
+                self.draw_board()
+                self.score += 1
+                self.draw_score()
+                break
+
+    def can_move(self, x, y):
+        if self.col + y < 0:
+            return False
+        try:
+            return self.matrix[self.row + x][self.col + y] != "X"
+        except IndexError:
+            pass
+        return False
+
+    def update_matrix(self):
+        self.matrix[self.old_row][self.old_col] = "X"
+
+    def clean_matrix(self, line):
+        self.matrix.pop(line)
+        self.matrix.insert(0, [" "for col in range(self.columns)])
+
+    def draw_board(self):
+        for i, line in enumerate(self.matrix):
+            self.stdscr.addstr(i, 0, ''.join(line))
 
     def left_arrow(self):
-        self.old_x = self.cursor_x
-        self.cursor_x -= 1
+        if self.can_move(0, -1):
+            self.col -= 1
 
     def right_arrow(self):
-        self.old_x = self.cursor_x
-        self.cursor_x += 1
+        if self.can_move(0, 1):
+            self.col += 1
 
     def space(self):
         # for rotation
         pass
 
-    def move(self):
-        self.stdscr.delch(self.cursor_y, self.old_x)
-        self.stdscr.delch(self.old_y, self.cursor_x)
-        self.stdscr.addstr(self.cursor_y, self.cursor_x, "X")
+    def update(self):
+        self.stdscr.addstr(self.old_row, self.old_col, " ")
+        self.stdscr.addstr(self.row, self.col, "X")
+        self.stdscr.refresh()
+        self.debug()
+
+    def debug(self):
+        with open('log', "a+") as f:
+            f.write("old (%s, %s) new (%s, %s) \n" %
+                    (self.old_row, self.old_col, self.row, self.col))
+
+    def resize_window(self):
+        self.update_size_window()
+        self.draw_score()
+        self.draw_board()
+
+    def update_size_window(self):
+        self.height, self.width = self.stdscr.getmaxyx()
