@@ -1,5 +1,6 @@
 import curses
 from random import randint
+from time import time, sleep
 
 
 class Tetris:
@@ -15,13 +16,15 @@ class Tetris:
             - Display for the next on the score screen.
     """
 
-    complex_blocks = (((0, 0), (1, 0), (1, -1), (1, -2)), # => (0, 0) (0, -1) (-1, -1) (-2, -1)
-                       ((0, 0), (1, 0), (1, 1), (1, 2)), # => (0, 0) (0, -1) (1, -1) (2, -1)
-                       ((0, 0), (1, 0), (0, 1), (1, 1)), # => (0, 0) (0, -1) (1, 0) (1, -1)
-                       ((0, 0), (0, 1), (1, 1), (1, 2)), # => (0, 0) (1, 0) (1, -1) (2, -1)
-                       ((0, 0), (1, 0), (2, 0), (3, 0))) # => (0, 0) (0, -1) (0, -2) (0, -3)
+    complex_blocks = (((0, 0), (1, 0), (1, -1), (1, -2)),  # => (0, 0) (0, -1) (-1, -1) (-2, -1)
+                      # => (0, 0) (0, -1) (1, -1) (2, -1)
+                      ((0, 0), (1, 0), (1, 1), (1, 2)),
+                      # => (0, 0) (0, -1) (1, 0) (1, -1)
+                      ((0, 0), (1, 0), (0, 1), (1, 1)),
+                      # => (0, 0) (1, 0) (1, -1) (2, -1)
+                      ((0, 0), (0, 1), (1, 1), (1, 2)),
+                      ((0, 0), (1, 0), (2, 0), (3, 0)))  # => (0, 0) (0, -1) (0, -2) (0, -3)
     num_blocks = len(complex_blocks)
-
 
     def __init__(self):
         key_int = (259, 258, 260, 261, 32, 410)
@@ -33,9 +36,12 @@ class Tetris:
         self.columns = self.width // 2
         self.rows = self.height
         self.matrix = [[" "] * self.columns for _ in range(self.rows)]
+        self.level = 0.01
 
     def _init_cli(self):
         self.stdscr = curses.initscr()
+        curses.start_color()
+        curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
         curses.noecho()
         curses.curs_set(0)
         self.score = 0
@@ -48,15 +54,20 @@ class Tetris:
             self.stdscr.addstr(i, self.columns, "||%s" %
                                (" " * (size_score - 2)))
         middle = self.columns + (size_score - 5) // 2
-        self.stdscr.addstr(self.rows // 2 - 5, middle, "Score:")
-        self.stdscr.addstr(self.rows // 2 - 4, middle, "%s" % self.score)
+        self.stdscr.addstr(self.rows // 2 - 5, middle + 2,
+                           "Score:", curses.color_pair(1))
+        self.stdscr.addstr(self.rows // 2 - 4, middle + 2, "%s" %
+                           self.score, curses.color_pair(1))
 
     def _generate_block(self):
         col = randint(2, self.columns - 3)
         self.row, self.old_row = 0, 0
         self.col, self.old_col = col, col
         self.block = self.complex_blocks[randint(0, self.num_blocks - 1)]
-        self._update()
+        if self._can_move(self.block, 0, 0):
+            self._update()
+        else:
+            self.finish = True
 
     def _save_old_pos(self):
         self.old_row = self.row
@@ -65,13 +76,14 @@ class Tetris:
     def _has_score(self):
         for y, x in self.block:
             self.matrix[self.old_row + y][self.old_col + x] = "X"
-        line_destroy = [i for i, line in enumerate(self.matrix) if line.count("X") == self.columns]
+        line_destroy = [i for i, line in enumerate(
+            self.matrix) if line.count("X") == self.columns]
         if line_destroy:
             for line in line_destroy[::-1]:
                 self.matrix.pop(line)
             for _ in line_destroy:
                 self.matrix.insert(0, [" "for col in range(self.columns)])
-                self.score += 1
+            self.score += len(line_destroy)
             self._draw_board()
             self._draw_score()
 
@@ -85,8 +97,7 @@ class Tetris:
             return True
         except IndexError:
             pass
-        return False 
-        
+        return False
 
     def _draw_board(self):
         for i, line in enumerate(self.matrix):
@@ -112,18 +123,27 @@ class Tetris:
         self._generate_block()
         self._draw_score()
         self.finish = False
+        start = time()
         while not self.finish:
-            self.speed = 50
-            count = 0
-            while count <= self.speed:
-                key = self.stdscr.getch()
-                if key in self.mapping.keys():
-                    self._save_old_pos()
-                    getattr(self, self.mapping[key])()
-                    self._update()
-                curses.napms(10)
-                count += 1
-            self._move_down()
+            if time() - start >= self.level:
+                self._move_down()
+                start = time()
+            key = self.stdscr.getch()
+            if key in self.mapping.keys():
+                self._save_old_pos()
+                getattr(self, self.mapping[key])()
+                self._update()
+        self._end_game()
+
+    def _end_game(self):
+        self.stdscr.addstr(self.rows // 2, self.columns //
+                           2 - 5, "GAME OVER", curses.color_pair(1))
+        self.stdscr.addstr(self.rows // 2 + 1, self.columns //
+                           2 - 5, "Your score: %s" % self.score, curses.color_pair(1))
+        self.stdscr.refresh()
+        sleep(1)
+        self.stdscr.nodelay(False)
+        self.stdscr.getch()
 
     def left_arrow(self):
         if self._can_move(self.block, 0, -1):
@@ -137,7 +157,7 @@ class Tetris:
         pass
 
     def down_arrow(self):
-        self.speed = 5
+        self._move_down()
 
     def space(self):
         rotation = []
