@@ -9,21 +9,20 @@ class Tetris:
             - Objects:
                                         x
                                         x
-                  x | x   | xx | xx  |  x
-                xxx | xxx | xx |  xx |  x
+                  x | x   | xx | xx  |  x |  x
+                xxx | xxx | xx |  xx |  x | xxx
 
             - Rotation.
             - Display for the next on the score screen.
     """
 
-    complex_blocks = (((0, 0), (1, 0), (1, -1), (1, -2)),  # => (0, 0) (0, -1) (-1, -1) (-2, -1)
-                      # => (0, 0) (0, -1) (1, -1) (2, -1)
+    complex_blocks = (((0, 0), (1, 0), (1, -1), (1, -2)),
                       ((0, 0), (1, 0), (1, 1), (1, 2)),
-                      # => (0, 0) (0, -1) (1, 0) (1, -1)
                       ((0, 0), (1, 0), (0, 1), (1, 1)),
-                      # => (0, 0) (1, 0) (1, -1) (2, -1)
                       ((0, 0), (0, 1), (1, 1), (1, 2)),
-                      ((0, 0), (1, 0), (2, 0), (3, 0)))  # => (0, 0) (0, -1) (0, -2) (0, -3)
+                      ((0, 0), (1, 0), (2, 0), (3, 0)),
+                      ((0, 0), (1, 0), (1, 1), (1, -1))
+                      )
     num_blocks = len(complex_blocks)
 
     def __init__(self):
@@ -36,7 +35,7 @@ class Tetris:
         self.columns = self.width // 2
         self.rows = self.height
         self.matrix = [[" "] * self.columns for _ in range(self.rows)]
-        self.level = 0.01
+        self.level = 0.5
 
     def _init_cli(self):
         self.stdscr = curses.initscr()
@@ -53,21 +52,31 @@ class Tetris:
         for i in range(self.rows):
             self.stdscr.addstr(i, self.columns, "||%s" %
                                (" " * (size_score - 2)))
-        middle = self.columns + (size_score - 5) // 2
-        self.stdscr.addstr(self.rows // 2 - 5, middle + 2,
+        self.middle = self.columns + (size_score - 5) // 2
+
+        self.stdscr.addstr(self.rows // 2 - 5, self.middle,
                            "Score:", curses.color_pair(1))
-        self.stdscr.addstr(self.rows // 2 - 4, middle + 2, "%s" %
-                           self.score, curses.color_pair(1))
+        self.stdscr.addstr(self.rows // 2 - 4, self.middle,
+                           "%s" % self.score, curses.color_pair(1))
 
     def _generate_block(self):
         col = randint(2, self.columns - 3)
         self.row, self.old_row = 0, 0
         self.col, self.old_col = col, col
         self.block = self.complex_blocks[randint(0, self.num_blocks - 1)]
-        if self._can_move(self.block, 0, 0):
-            self._update()
-        else:
+        if not self._can_move(self.block, 0, 0):
             self.finish = True
+
+        if hasattr(self, 'next_block'):
+            for y, x in self.next_block:
+                self.stdscr.addstr(self.rows//2 - 10 + y, self.middle + x, " ")
+            self.block = self.next_block
+        else:
+            self.block = self.complex_blocks[randint(0, self.num_blocks - 1)]
+        self.next_block = self.complex_blocks[randint(0, self.num_blocks - 1)]
+        for y, x in self.next_block:
+            self.stdscr.addstr(self.rows//2 - 10 + y, self.middle + x, "X")
+        self._update()
 
     def _save_old_pos(self):
         self.old_row = self.row
@@ -88,11 +97,11 @@ class Tetris:
             self._draw_score()
 
     def _can_move(self, block, row, col):
-        if self.col + col < 0:
-            return False
         try:
             for y, x in block:
-                if self.matrix[self.row + y + row][self.col + x + col] == "X":
+                if (self.col + x + col < 0 or
+                    self.row + y + row < 0 or
+                    self.matrix[self.row + y + row][self.col + x + col] == "X"):
                     return False
             return True
         except IndexError:
@@ -120,8 +129,8 @@ class Tetris:
         self._update()
 
     def start_game(self):
-        self._generate_block()
         self._draw_score()
+        self._generate_block()
         self.finish = False
         start = time()
         while not self.finish:
@@ -163,6 +172,8 @@ class Tetris:
         rotation = []
         for y, x in self.block:
             rotation.append((x, -y))
+        if not self._can_move(rotation, 0, 0):
+            return
         for y, x in self.block:
             self.stdscr.addstr(self.row + y, self.col + x, " ")
         self.block = tuple(rotation)
