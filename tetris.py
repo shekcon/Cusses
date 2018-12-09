@@ -41,6 +41,7 @@ class Tetris:
         self.stdscr = curses.initscr()
         curses.start_color()
         curses.init_pair(1, curses.COLOR_RED, curses.COLOR_BLACK)
+        curses.init_pair(2, curses.COLOR_BLUE, curses.COLOR_BLACK)
         curses.noecho()
         curses.curs_set(0)
         self.score = 0
@@ -58,6 +59,8 @@ class Tetris:
                            "Score:", curses.color_pair(1))
         self.stdscr.addstr(self.rows // 2 - 4, self.middle,
                            "%s" % self.score, curses.color_pair(1))
+        self.stdscr.addstr(self.rows // 2 + 5, self.middle, "Rotation:")
+        self.stdscr.addstr(self.rows // 2 + 6, self.middle + 2, "space")
 
     def _generate_block(self):
         col = randint(2, self.columns - 3)
@@ -75,7 +78,8 @@ class Tetris:
             self.block = self.complex_blocks[randint(0, self.num_blocks - 1)]
         self.next_block = self.complex_blocks[randint(0, self.num_blocks - 1)]
         for y, x in self.next_block:
-            self.stdscr.addstr(self.rows//2 - 10 + y, self.middle + x, "X")
+            self.stdscr.addstr(self.rows//2 - 10 + y, self.middle + x + 2, "X",
+                               curses.color_pair(2))
         self._update()
 
     def _save_old_pos(self):
@@ -101,7 +105,8 @@ class Tetris:
             for y, x in block:
                 if (self.col + x + col < 0 or
                     self.row + y + row < 0 or
-                    self.matrix[self.row + y + row][self.col + x + col] == "X"):
+                    self.matrix[self.row + y + row][self.col + x + col]
+                        == "X"):
                     return False
             return True
         except IndexError:
@@ -148,7 +153,8 @@ class Tetris:
         self.stdscr.addstr(self.rows // 2, self.columns //
                            2 - 5, "GAME OVER", curses.color_pair(1))
         self.stdscr.addstr(self.rows // 2 + 1, self.columns //
-                           2 - 5, "Your score: %s" % self.score, curses.color_pair(1))
+                           2 - 5, "Your score: %s" % self.score,
+                           curses.color_pair(1))
         self.stdscr.refresh()
         sleep(1)
         self.stdscr.nodelay(False)
@@ -182,3 +188,6 @@ class Tetris:
         self.height, self.width = self.stdscr.getmaxyx()
         self._draw_score()
         self._draw_board()
+        for y, x in self.next_block:
+            self.stdscr.addstr(self.rows//2 - 10 + y, self.middle + x + 2, "X",
+                               curses.color_pair(2))
