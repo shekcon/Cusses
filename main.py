@@ -4,10 +4,11 @@ from tetris import Tetris, curses
 
 def main():
     game = Tetris()
-    try:
-        game.start_game()
-    except Exception:
-        pass
+    game.start_game()
+    # try:
+    #
+    # except Exception:
+    #     pass
     curses.endwin()
 
 
