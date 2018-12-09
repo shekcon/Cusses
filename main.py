@@ -4,7 +4,6 @@ from tetris import Tetris, curses
 
 def main():
     game = Tetris()
-    game.init_cli()
     try:
         game.start_game()
     except Exception:
