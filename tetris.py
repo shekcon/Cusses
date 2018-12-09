@@ -8,18 +8,20 @@ class Tetris:
             - Objects:
                                         x
                                         x
-                  x | x   | xx | xx  |  x
-                xxx | xxx | xx |  xx |  x
+                  x | x   | xx | xx  |  x |  x
+                xxx | xxx | xx |  xx |  x | xxx
 
             - Rotation.
             - Display for the next on the score screen.
     """
 
-    complex_blocks = (((0, 0), (1, 0), (1, -1), (1, -2)), # => (0, 0) (0, -1) (-1, -1) (-2, -1)
-                       ((0, 0), (1, 0), (1, 1), (1, 2)), # => (0, 0) (0, -1) (1, -1) (2, -1)
-                       ((0, 0), (1, 0), (0, 1), (1, 1)), # => (0, 0) (0, -1) (1, 0) (1, -1)
-                       ((0, 0), (0, 1), (1, 1), (1, 2)), # => (0, 0) (1, 0) (1, -1) (2, -1)
-                       ((0, 0), (1, 0), (2, 0), (3, 0))) # => (0, 0) (0, -1) (0, -2) (0, -3)
+    complex_blocks = (((0, 0), (1, 0), (1, -1), (1, -2)),
+                       ((0, 0), (1, 0), (1, 1), (1, 2)),
+                       ((0, 0), (1, 0), (0, 1), (1, 1)),
+                       ((0, 0), (0, 1), (1, 1), (1, 2)),
+                       ((0, 0), (1, 0), (2, 0), (3, 0)),
+                       ((0, 0), (1, 0), (1, 1), (1, -1))
+                       )
     num_blocks = len(complex_blocks)
 
 
@@ -47,15 +49,25 @@ class Tetris:
         for i in range(self.rows):
             self.stdscr.addstr(i, self.columns, "||%s" %
                                (" " * (size_score - 2)))
-        middle = self.columns + (size_score - 5) // 2
-        self.stdscr.addstr(self.rows // 2 - 5, middle, "Score:")
-        self.stdscr.addstr(self.rows // 2 - 4, middle, "%s" % self.score)
+        self.middle = self.columns + (size_score - 5) // 2
+
+        self.stdscr.addstr(self.rows // 2 - 5, self.middle, "Score:")
+        self.stdscr.addstr(self.rows // 2 - 4, self.middle, "%s" % self.score)
 
     def _generate_block(self):
         col = randint(2, self.columns - 3)
         self.row, self.old_row = 0, 0
         self.col, self.old_col = col, col
-        self.block = self.complex_blocks[randint(0, self.num_blocks - 1)]
+
+        if hasattr(self, 'next_block'):
+            for y, x in self.next_block:
+                self.stdscr.addstr(self.rows//2 - 10 + y, self.middle + x, " ")
+            self.block = self.next_block
+        else:
+            self.block = self.complex_blocks[randint(0, self.num_blocks - 1)]
+        self.next_block = self.complex_blocks[randint(0, self.num_blocks - 1)]
+        for y, x in self.next_block:
+            self.stdscr.addstr(self.rows//2 - 10 + y, self.middle + x, "X")
         self._update()
 
     def _save_old_pos(self):
@@ -110,8 +122,8 @@ class Tetris:
         self._update()
 
     def start_game(self):
-        self._generate_block()
         self._draw_score()
+        self._generate_block()
         self.finish = False
         while not self.finish:
             self.speed = 50
@@ -144,6 +156,8 @@ class Tetris:
         rotation = []
         for y, x in self.block:
             rotation.append((x, -y))
+        if not self._can_move(rotation, 0, 0):
+            return
         for y, x in self.block:
             self.stdscr.addstr(self.row + y, self.col + x, " ")
         self.block = tuple(rotation)
