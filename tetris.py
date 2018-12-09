@@ -98,7 +98,7 @@ class Tetris:
                 self.matrix.insert(0, [" "for col in range(self.columns)])
             self.score += len(line_destroy)
             self._draw_board()
-            self._draw_score()
+        self._draw_score()
 
     def _can_move(self, block, row, col):
         try:
